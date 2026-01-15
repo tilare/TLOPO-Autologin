@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 
-# Try to import requests; if not found, warn the user
+# Try to import requests
 try:
     import requests
 except ImportError:
@@ -14,58 +14,75 @@ except ImportError:
 # --- CONFIGURATION ---
 USERNAME = 'YourUsername'
 PASSWORD = 'YourPassword'
-# Path to the game engine executable
-# double-check this path exists on your PC
 GAME_EXE_PATH = r"C:\Program Files (x86)\TLOPO\tlopo.exe" 
 # ---------------------
 
 def login_and_play():
     if not os.path.exists(GAME_EXE_PATH):
         print(f"Error: Game executable not found at: {GAME_EXE_PATH}")
+        input("Press Enter to exit...")
         return
 
-    print("Authenticating with TLOPO API...")
+    print(f"Authenticating '{USERNAME}'...")
+    
+    # 1. First Login Attempt
+    session = requests.Session()
+    payload = {'username': USERNAME, 'password': PASSWORD}
+    headers = {'Content-type': 'application/x-www-form-urlencoded'}
     
     try:
-        # standard login request
-        payload = {'username': USERNAME, 'password': PASSWORD}
-        headers = {'Content-type': 'application/x-www-form-urlencoded'}
-        
-        r = requests.post('https://api.tlopo.com/login/', data=payload, headers=headers)
-        
-        # Check if the API call itself worked (HTTP 200)
-        if r.status_code != 200:
-            print(f"API Error (HTTP {r.status_code})")
-            return
-
+        r = session.post('https://api.tlopo.com/login/', data=payload, headers=headers)
         response = r.json()
-
     except Exception as e:
         print(f"Connection failed: {e}")
+        input("Press Enter to exit...")
         return
 
-    # Check if the response contains the data we need
-    if 'gameserver' in response and 'token' in response:
-        print(f"Login successful! Token: {response['token'][:10]}...") # Print part of token for verification
+    # 2. Check Status
+    status = int(response.get('status', 0))
+
+    # STATUS 3: 2FA REQUIRED
+    if status == 3:
+        print("\n>> Two-Factor Authentication (2FA) requested by server.")
+        gtoken = input(">> Please enter your 2FA Code (from app/email): ")
         
-        # Set Environment Variables required by the game engine
+        # Resend login with the 2FA code (gtoken)
+        payload['gtoken'] = gtoken
+        print("Verifying code...")
+        
+        try:
+            r = session.post('https://api.tlopo.com/login/', data=payload, headers=headers)
+            response = r.json()
+            status = int(response.get('status', 0))
+        except Exception as e:
+            print(f"Connection failed: {e}")
+            return
+
+    # STATUS 11: NEW LOCATION (Arrrmor)
+    if status == 11:
+        print("\n>> TLOPO 'Arrrmor' triggered.")
+        print(">> The server sees this as a new location. Please check your email to approve this IP.")
+        input("Press Enter to exit...")
+        return
+
+    # 3. Final Success Check
+    if status == 7 and 'token' in response:
+        print(f"\nLogin successful! Token acquired.")
+        
+        # Set Environment Variables
         env = os.environ.copy()
         env['TLOPO_GAMESERVER'] = response['gameserver']
         env['TLOPO_PLAYCOOKIE'] = response['token']
         
-        # Launch the game
+        # Launch
         print("Launching TLOPO...")
         subprocess.Popen([GAME_EXE_PATH], env=env, cwd=os.path.dirname(GAME_EXE_PATH))
         
     else:
-        # Handle errors or 2FA requests
-        message = response.get('message', 'Unknown error')
-        print(f"\nLogin Failed: {message}")
-        
-        # Specific check for 2FA
-        if "two-factor" in message.lower() or "gtoken" in str(response):
-            print(">> It looks like you have 2FA enabled. This script currently only supports standard password login.")
-            print(">> You may need to disable 2FA to use auto-login, or modify the script to accept a 'gtoken'.")
+        # Failure
+        msg = response.get('message', 'Unknown error')
+        print(f"\nLogin Failed (Status {status}): {msg}")
+        input("Press Enter to exit...")
 
 if __name__ == "__main__":
     login_and_play()
