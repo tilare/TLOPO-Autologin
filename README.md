@@ -13,4 +13,4 @@ How to use this
 
     If you DO have 2FA: A text line will appear saying >> Please enter your 2FA Code.
 
-    Open your authenticator app (or check your email), type the code into the black window, and hit Enter. The game will launch immediately.
+    Open your authenticator app (or check your email), type the code into the window, and hit Enter. The game will then launch.
