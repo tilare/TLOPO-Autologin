@@ -5,7 +5,7 @@ REQUIRES PYTHON TO BE INSTALLED ON YOUR SYSTEM
 
 Edit the USERNAME, PASSWORD, and GAME_EXE_PATH in the script. Note: You must point to the actual game client executable (tlopo.exe), not the launcher.exe.
 
-How to use this
+How to use this:
 
     Run the script.
 
